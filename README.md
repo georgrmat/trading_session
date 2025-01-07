@@ -54,7 +54,7 @@ Make sure you have the following installed:
 ### Running the Notebook
 1. Clone this repository:  
    ```bash
-   git clone https://github.com/yourusername/trading-strategies-bollinger-bands.git
+   git clone https://github.com/georgrmat/trading_session.git
    cd trading-strategies-bollinger-bands
    ```
 2. Install the required dependencies:  
