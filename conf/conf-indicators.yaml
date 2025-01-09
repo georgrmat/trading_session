@@ -28,6 +28,8 @@ bollinger_band_periods:
 
 bollinger_band_std_multipliers: 
   - 1
+  - 1.5
   - 2
-  - 5
+  - 2.5
+  - 3
   - 10

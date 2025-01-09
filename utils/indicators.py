@@ -40,14 +40,14 @@ def calculate_bollinger_bands(df_ohlcv: pd.DataFrame,
                       'bollinger_upper', and 'bollinger_lower'.
     """
     # Calculate the rolling mean (middle band)
-    df_ohlcv['bollinger_mid'] = df_ohlcv[price_column].rolling(window=period).mean()
+    df_ohlcv['bollinger_mid_period'] = df_ohlcv[price_column].rolling(window=period).mean()
     
     # Calculate the rolling standard deviation
     rolling_std = df_ohlcv[price_column].rolling(window=period).std()
     
     # Calculate the upper and lower bands
-    df_ohlcv['bollinger_upper'] = df_ohlcv['bollinger_mid'] + (rolling_std * std_multiplier)
-    df_ohlcv['bollinger_lower'] = df_ohlcv['bollinger_mid'] - (rolling_std * std_multiplier)
+    df_ohlcv['bollinger_upper_period'] = df_ohlcv['bollinger_mid_period'] + (rolling_std * std_multiplier)
+    df_ohlcv['bollinger_lower_period'] = df_ohlcv['bollinger_mid_period'] - (rolling_std * std_multiplier)
     
     return df_ohlcv
 
