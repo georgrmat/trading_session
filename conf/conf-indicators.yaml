@@ -33,3 +33,13 @@ bollinger_band_std_multipliers:
   - 2.5
   - 3
   - 10
+
+bollinger_bands_buy_column: 'bollinger_lower_period'
+
+bollinger_bands_sell_columns:
+  - 'bollinger_mid_period'
+  - 'bollinger_upper_period'
+
+using_emas:
+  - True
+  - False
