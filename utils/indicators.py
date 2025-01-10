@@ -224,21 +224,22 @@ def get_kpis(df_trades: pd.DataFrame,
 
     try:
         n = len(df_trades)
+        final_capital = initial_capital * (1 + df_trades['yield']/100).prod()
         res['nb_trades'] = n
-        res['final_capital'] = initial_capital * (1 + df_trades['yield']/100).prod()
+        res['final_capital'] = final_capital
+        res['PnL'] = final_capital - initial_capital
         res['win_rate'] = len(df_trades[df_trades['yield'] >= 0]) / n
         res['avg_win'] = df_trades[df_trades['yield'] >= 0]['yield'].mean()
         res['avg_loss'] = df_trades[df_trades['yield'] < 0]['yield'].mean()
         res['risk_reward'] = res['avg_win'] / abs(res['avg_loss']) if res['avg_loss'] != 0 else 0
-        res['sharpe'] = df_trades['yield'].mean() / df_trades['yield'].std()
         
     except:
         res['nb_trades'] = 0
         res['final_capital'] = initial_capital
+        res['PnL'] = 0
         res['win_rate'] = 0
         res['avg_win'] = 0
         res['avg_loss'] = 0
         res['risk_reward'] = 0
-        res['sharpe'] = 0
         
     return res
