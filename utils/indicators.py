@@ -1,5 +1,7 @@
 import pandas as pd
 
+
+
 def calculate_ema(df_ohlcv: pd.DataFrame, 
                   periods: list, 
                   price_column: str = 'close') -> pd.DataFrame:
@@ -52,3 +54,143 @@ def calculate_bollinger_bands(df_ohlcv: pd.DataFrame,
     return df_ohlcv
 
 
+
+def get_data_for_emas_strategy_backtesting(df_emas: pd.DataFrame,
+                                          ema_period1: int,
+                                          ema_period2: int,
+                                          ema_period3: int,
+                                          ema_period4: int) -> pd.DataFrame:
+
+    df_emas_with_orders = df_emas.copy()
+
+    df_emas_with_orders['emas_optimal_position'] = ((df_emas_with_orders[f'ema_{ema_period1}'] >= df_emas_with_orders[f'ema_{ema_period2}']) * \
+                                                       (df_emas_with_orders[f'ema_{ema_period2}'] >= df_emas_with_orders[f'ema_{ema_period3}']) * \
+                                                       (df_emas_with_orders[f'ema_{ema_period3}'] >= df_emas_with_orders[f'ema_{ema_period4}'])).astype(int)
+
+    df_emas_with_orders['enterLong'] = df_emas_with_orders['emas_optimal_position'].diff()
+
+    return df_emas_with_orders
+
+
+
+
+
+def get_emas_strategy_trades_not_vectorized(df_emas_with_orders: pd.DataFrame) -> pd.DataFrame:
+    """
+    Extract trades from a DataFrame based on the enterLong column.
+    
+    Args:
+        df_emas_with_orders (pd.DataFrame): DataFrame containing a column 'enterLong'
+                                            (1 for entry, -1 for exit, 0 for nothing).
+                                            
+    Returns:
+        pd.DataFrame: DataFrame containing trade details (entry_time, entry_price,
+                      exit_time, exit_price, and profit).
+    """
+    trades = []
+    current_trade = {}
+
+    # Iterate over the rows of the DataFrame
+    for idx, row in df_emas_with_orders.iterrows():
+        if row['enterLong'] == 1:  # Start of a trade
+            current_trade = {'entry_time': row['timestamp'], 'entry_price': row['close']}
+        elif row['enterLong'] == -1 and current_trade:  # End of a trade
+            current_trade['exit_time'] = row['timestamp']
+            current_trade['exit_price'] = row['close']
+            trades.append(current_trade)
+            current_trade = {}
+
+    # Convert the list of trades to a DataFrame
+    df_trades = pd.DataFrame(trades)
+    df_trades['yield'] = 100 * (df_trades['exit_price'] - df_trades['entry_price']) / df_trades['entry_price']
+    return df_trades
+
+
+
+def get_emas_strategy_trades_vectorized(df_emas_with_orders: pd.DataFrame) -> pd.DataFrame:
+    """
+    Extract trades from a DataFrame based on the enterLong column.
+    
+    Args:
+        df_emas_with_orders (pd.DataFrame): DataFrame containing a column 'enterLong'
+                                            (1 for entry, -1 for exit, 0 for nothing).
+                                            
+    Returns:
+        pd.DataFrame: DataFrame containing trade details (entry_time, entry_price,
+                      exit_time, exit_price, and profit).
+    """
+    first_index = df_emas_with_orders[df_emas_with_orders['enterLong'] == 1].index[0]
+    last_index = df_emas_with_orders[df_emas_with_orders['enterLong'] == -1].index[-1]
+
+    df_emas_with_orders_first_last_index = df_emas_with_orders.loc[first_index: last_index]
+    df_orders = df_emas_with_orders_first_last_index[df_emas_with_orders_first_last_index['enterLong'].isin([1, -1])]
+    
+    entries = df_orders[df_orders['enterLong'] == 1].reset_index(drop = True)
+    exits = df_orders[df_orders['enterLong'] == -1].reset_index(drop = True)
+
+    df_trades = pd.DataFrame({
+        'entry_time': entries['timestamp'],
+        'entry_price': entries['close'],
+        'exit_time': exits['timestamp'],
+        'exit_price': exits['close']
+    })
+    
+    df_trades['yield'] = 100 * (df_trades['exit_price'] - df_trades['entry_price']) / df_trades['entry_price']
+    
+    return df_trades
+
+
+
+def get_data_for_bollinger_bands_backtesting(df_emas_bollinger_bands: pd.DataFrame,
+                                             ema_period1: int,
+                                             ema_period2: int,
+                                             ema_period3: int,
+                                             ema_period4: int,
+                                             bollinger_bands_period: int,
+                                             bollinger_bands_std_multiplier: float,
+                                             bollinger_bands_buy_column: str,
+                                             bollinger_bands_sell_column: str,
+                                             using_emas: bool = True) -> pd.DataFrame:
+
+    df_emas_bollinger_bands_with_orders = calculate_bollinger_bands(df_emas_bollinger_bands, 
+                                                                    period = bollinger_bands_period, 
+                                                                    price_column = 'close', 
+                                                                    std_multiplier = bollinger_bands_std_multiplier)
+    
+    enterLong_columns = []
+
+    if using_emas:
+        df_emas_bollinger_bands_with_orders['emas_optimal_position'] = ((df_emas_bollinger_bands_with_orders[f'ema_{ema_period1}'] >= df_emas_bollinger_bands_with_orders[f'ema_{ema_period2}']) * \
+                                                           (df_emas_bollinger_bands_with_orders[f'ema_{ema_period2}'] >= df_emas_bollinger_bands_with_orders[f'ema_{ema_period3}']) * \
+                                                           (df_emas_bollinger_bands_with_orders[f'ema_{ema_period3}'] >= df_emas_bollinger_bands_with_orders[f'ema_{ema_period4}'])).astype(int)
+        enterLong_columns.append('emas_optimal_position')
+
+    df_emas_bollinger_bands_with_orders['bollinger_bands_long_condition'] = (df_emas_bollinger_bands_with_orders['close'] >= df_emas_bollinger_bands_with_orders[bollinger_bands_buy_column]).astype(int)
+    enterLong_columns.append('bollinger_bands_long_condition')
+    
+    df_emas_bollinger_bands_with_orders['enterLong'] = df_emas_bollinger_bands_with_orders[enterLong_columns].prod(axis = 1)
+    df_emas_bollinger_bands_with_orders['exitLong'] = (df_emas_bollinger_bands_with_orders['close'] <= df_emas_bollinger_bands_with_orders[bollinger_bands_sell_column]).astype(int)
+
+    return df_emas_bollinger_bands_with_orders
+
+
+
+
+
+
+
+
+
+def get_kpis(df_trades: pd.DataFrame,
+             params: dict) -> pd.DataFrame:
+    res = {}
+    n = len(df_trades)
+    res.update(params)
+    res['nb_trades'] = n
+    res['final_capital'] = res['init_capital'] * (1 + df_trades['yield']/100).prod()
+    res['win_rate'] = len(df_trades[df_trades['yield'] >= 0]) / n
+    res['avg_win'] = df_trades[df_trades['yield'] >= 0]['yield'].mean()
+    res['avg_loss'] = df_trades[df_trades['yield'] < 0]['yield'].mean()
+    res['risk_reward'] = res['avg_win'] / abs(res['avg_loss']) if res['avg_loss'] != 0 else 0
+    res['sharpe'] = df_trades['yield'].mean() / df_trades['yield'].std()
+    return res
